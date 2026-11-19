@@ -1,0 +1,9 @@
+{
+  "name": "Word Groups Solitaire",
+  "short_name": "Word Groups",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#2f5a4c",
+  "theme_color": "#2f5a4c",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

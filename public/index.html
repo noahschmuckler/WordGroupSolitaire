@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Word Groups Solitaire</title>
+<meta name="description" content="A calm word-sorting solitaire. Gather words into their categories. No move limits, no ads.">
+<meta name="theme-color" content="#2f5a4c">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="bar">
+  <div class="brand">Word Groups</div>
+  <div class="stats">
+    <span><b id="groupsDone">0/0</b> groups</span>
+    <span><b id="moveCount">0</b> moves</span>
+  </div>
+  <nav class="actions">
+    <button id="btnUndo" title="Undo (Ctrl+Z)" aria-label="Undo">
+      <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>Undo</span>
+    </button>
+    <button id="btnHint" title="Hint (H)" aria-label="Hint">
+      <svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"/></svg><span>Hint</span>
+    </button>
+    <button id="btnNew" title="New deal" aria-label="New deal">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="12" height="16" rx="2"/><path d="M8 3h11a2 2 0 0 1 2 2v13"/></svg><span>New</span>
+    </button>
+    <button id="btnHelp" title="How to play" aria-label="How to play">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg><span>Help</span>
+    </button>
+  </nav>
+</header>
+
+<main id="wrap">
+  <div id="board" aria-label="Game board"></div>
+</main>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="dlgNew">
+  <form method="dialog">
+    <h2>New deal</h2>
+    <p class="muted">Choose how big a puzzle you'd like. There's no move limit, ever.</p>
+    <div class="choices" id="diffChoices"></div>
+    <label class="toggle"><input type="checkbox" id="optHighlight"> Highlight where the selected card can go</label>
+    <div class="row">
+      <button value="cancel" class="ghost">Cancel</button>
+      <button value="deal" class="primary" id="btnDeal">Deal</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgHelp">
+  <form method="dialog">
+    <h2>How to play</h2>
+    <ul class="help">
+      <li><b>Goal:</b> gather every word into its category.</li>
+      <li><b>Category cards</b> (the coloured ones) go into the empty slots at the top left. Each one shows how many words it needs.</li>
+      <li>Once a category is in a slot, drop its words onto it. When it's full, it clears and frees the slot.</li>
+      <li>In the columns, stack words that <b>share a category</b>, and move those stacks together. Anything can go into an empty column.</li>
+      <li>Tap the deck to draw a card. When it runs out, tap again to recycle it. Unlimited.</li>
+      <li>Some words fit more than one category (<i>Orange</i>: fruit or colour?). Any reading is accepted as long as the deal can still be finished.</li>
+      <li>Drag cards, or tap one to pick it up and tap where it should go. Tap a picked-up card again to send it somewhere sensible automatically.</li>
+      <li>Undo is unlimited. Keys: <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>H</kbd> hint, <kbd>Space</kbd> draw.</li>
+    </ul>
+    <div class="row"><button value="ok" class="primary">Got it</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgWin">
+  <form method="dialog">
+    <h2>All groups gathered</h2>
+    <p class="muted" id="winSummary"></p>
+    <div id="winList" class="winlist"></div>
+    <div class="row">
+      <button value="close" class="ghost">Admire the board</button>
+      <button value="again" class="primary">Deal again</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="words.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
