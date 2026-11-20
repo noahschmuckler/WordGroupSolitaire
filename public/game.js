@@ -740,7 +740,7 @@ dlgOut.addEventListener('close', () => {
 });
 // Rotate between the "sponsors", never the same one three times running.
 function pickAd() {
-  const ads = { pin: PinPull, park: ParkJam, draw: DrawSave };
+  const ads = { pin: PinPull, park: ParkJam, draw: DrawSave, crowd: CrowdRun };
   const keys = Object.keys(ads);
   const recent = store.get('wgs.recentAds', []);
   let pool = keys;

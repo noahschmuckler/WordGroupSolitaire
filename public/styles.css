@@ -297,3 +297,9 @@ body.pp-open { overflow: hidden; }
 .pp.ds { background: linear-gradient(165deg, #ffcf3f 0%, #ff8a4c 45%, #f2457c 85%, #b13cf0 100%); }
 .pp.ds .pp-banner { color: #ffffff; text-shadow: 0 3px 0 #c0392b, 0 6px 14px rgba(0,0,0,.25); }
 .pp.ds .pp-stage canvas { border-radius: 16px; box-shadow: 0 10px 30px rgba(80,0,40,.3); }
+
+/* Crowd Run theme */
+.pp.cr { background: linear-gradient(165deg, #3ad1c4 0%, #3a86ff 45%, #7b3cf5 80%, #ff4fa3 100%); }
+.pp.cr .pp-banner { color: #fff; text-shadow: 0 3px 0 #2b3fb0, 0 6px 14px rgba(0,0,0,.25); }
+.pp.cr .pp-stage canvas { border-radius: 16px; box-shadow: 0 10px 30px rgba(20,0,80,.3); }
+.pp.cr .pp-stage { touch-action: none; }

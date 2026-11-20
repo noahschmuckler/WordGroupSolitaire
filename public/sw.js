@@ -1,5 +1,5 @@
 // Network-first with cache fallback, so the game works offline once loaded.
-const CACHE = 'wgs-v4';
+const CACHE = 'wgs-v5';
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', e => {
