@@ -286,3 +286,9 @@ body.pp-open { overflow: hidden; }
 .pp-install { animation: throb 1s ease-in-out infinite; }
 @keyframes throb { 50% { transform: scale(1.05); } }
 .pp-collect { background: #efe9fb; color: #5b3cf5; }
+
+/* Parking Jam theme */
+.pp.pj { background: linear-gradient(165deg, #0bb5c9 0%, #2f7cf6 45%, #7a4dff 80%, #ff5fa2 100%); }
+.pp.pj .pp-banner { color: #fff3a8; text-shadow: 0 3px 0 #1d4fb8, 0 6px 14px rgba(0,0,0,.25); }
+.pp-tip .pj-patience, .pp-tip .pj-bus { display: inline-block; margin: 0 6px; white-space: nowrap; }
+.pp-tip .pj-bus { opacity: .85; font-weight: 500; }

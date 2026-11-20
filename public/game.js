@@ -738,8 +738,17 @@ dlgOut.addEventListener('close', () => {
     toast('Move limit off. Play as long as you like.'); render();
   }
 });
+// Rotate between the "sponsors", never the same one three times running.
+function pickAd() {
+  const ads = { pin: PinPull, park: ParkJam };
+  const recent = store.get('wgs.recentAds', []);
+  let key = Math.random() < 0.5 ? 'pin' : 'park';
+  if (recent.length >= 2 && recent[0] === key && recent[1] === key) key = key === 'pin' ? 'park' : 'pin';
+  store.set('wgs.recentAds', [key, ...recent].slice(0, 2));
+  return ads[key];
+}
 function playAd() {
-  PinPull.open({
+  pickAd().open({
     onDone: ({ reward, message }) => {
       S.left += reward; save(); render();
       toast(message || `+${reward} moves. Back to sorting!`);

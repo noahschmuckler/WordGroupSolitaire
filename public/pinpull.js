@@ -191,42 +191,23 @@ if (typeof document === 'undefined') return;
 // ==================================================================== UI ====
 const BANNERS = ['Only 2% can solve this!', 'IMPOSSIBLE LEVEL', 'Genius only 🧠', 'Can you beat it? 🤔',
   '99% FAIL THIS!', 'Your brain will thank you', 'Mom\'s favourite puzzle', 'Too easy? Prove it.'];
-const store = {
-  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
-};
-let dodgedThisSession = false;
+const store = AdShell.store;
 
 function open({ onDone, rewards = { win: 15, fail: 8, skip: 5 } }) {
-  const lvl = store.get('pp.level', 1);
-  const ov = document.createElement('div');
-  ov.className = 'pp';
-  ov.innerHTML = `
-    <div class="pp-top">
-      <span class="pp-chip">AD</span>
-      <span class="pp-level"></span>
-      <button class="pp-x" aria-label="Close"><span class="pp-count">5</span></button>
-    </div>
-    <div class="pp-banner"></div>
-    <div class="pp-stage"><canvas></canvas></div>
-    <div class="pp-tip"></div>
-    <div class="pp-result" hidden></div>`;
-  document.body.appendChild(ov);
-  document.body.classList.add('pp-open');
-  const cv = ov.querySelector('canvas');
+  const shell = AdShell.create({ rewards, onDone, onRetry: () => load(), onClose: () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); } });
+  const ov = shell.el;
+  const cv = shell.canvas;
   const ctx = cv.getContext('2d');
-  const xBtn = ov.querySelector('.pp-x');
-  const resultEl = ov.querySelector('.pp-result');
-  let finished = false, raf = 0, world = null, scale = 1, dpr = 1, sprites = {}, particles = [], resultShown = false, resultAt = 0;
-  let levelNo = lvl;
+  let raf = 0, world = null, scale = 1, dpr = 1, sprites = {}, particles = [], resultShown = false, resultAt = 0;
+  let levelNo = store.get('pp.level', 1);
 
   function load() {
     const idx = (levelNo - 1) % LEVELS.length;
     world = buildWorld(idx, { mirror: levelNo > 1 && Math.random() < 0.5, seed: (Math.random() * 1e9) | 0 });
-    particles = []; resultShown = false; resultEl.hidden = true; resultEl.innerHTML = '';
-    ov.querySelector('.pp-level').textContent = `Level ${levelNo.toLocaleString()} of 9,999`;
-    ov.querySelector('.pp-banner').textContent = BANNERS[(levelNo - 1) % BANNERS.length];
-    ov.querySelector('.pp-tip').textContent = world.def.tip || 'Pull the pins in the right order!';
+    particles = []; resultShown = false; resultAt = 0; shell.hideResult();
+    shell.setLevel(`Level ${levelNo.toLocaleString()} of 9,999`);
+    shell.setBanner(BANNERS[(levelNo - 1) % BANNERS.length]);
+    shell.setTip(world.def.tip || 'Pull the pins in the right order!');
   }
 
   function resize() {
@@ -351,47 +332,8 @@ function open({ onDone, rewards = { win: 15, fail: 8, skip: 5 } }) {
   function showResult() {
     const win = world.result === 'win';
     if (win) { levelNo++; store.set('pp.level', levelNo); }
-    resultEl.innerHTML = win ? `
-      <h3>Brilliant! 🎉</h3>
-      <p>You're officially in the top 2%.</p>
-      <button class="pp-install">INSTALL NOW</button>
-      <button class="pp-collect">Collect +${rewards.win} moves</button>` : `
-      <h3>So close! 😱</h3>
-      <p>${world.reason}<br><small>99% of players fail this level.</small></p>
-      <button class="pp-retry">Try again</button>
-      <button class="pp-collect">Collect +${rewards.fail} moves anyway</button>`;
-    resultEl.hidden = false;
-    const collect = msg => finish(win ? 'win' : 'fail', win ? rewards.win : rewards.fail, msg);
-    resultEl.querySelector('.pp-collect').onclick = () => collect();
-    const inst = resultEl.querySelector('.pp-install');
-    if (inst) inst.onclick = () => collect('Good news: it\'s already installed. You\'re playing it.');
-    const retry = resultEl.querySelector('.pp-retry');
-    if (retry) retry.onclick = () => load();
+    shell.showResult(win, world.reason);
   }
-
-  function finish(result, reward, msg) {
-    if (finished) return;
-    finished = true;
-    cancelAnimationFrame(raf);
-    window.removeEventListener('resize', resize);
-    ov.classList.add('pp-out');
-    setTimeout(() => { ov.remove(); document.body.classList.remove('pp-open'); }, 250);
-    onDone && onDone({ result, reward, message: msg });
-  }
-
-  // Close button: a countdown, then a tiny ✕ that dodges once.
-  let count = 5;
-  const tick = setInterval(() => {
-    count--;
-    if (count > 0) xBtn.querySelector('.pp-count').textContent = count;
-    else { clearInterval(tick); xBtn.innerHTML = '✕'; xBtn.classList.add('ready'); }
-  }, 1000);
-  xBtn.addEventListener('click', () => {
-    if (!xBtn.classList.contains('ready')) return;
-    if (!dodgedThisSession) { dodgedThisSession = true; xBtn.classList.add('dodge'); return; }
-    clearInterval(tick);
-    finish('skip', rewards.skip);
-  });
 
   cv.addEventListener('pointerdown', e => {
     if (world.result) return;
