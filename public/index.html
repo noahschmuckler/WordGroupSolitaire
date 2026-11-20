@@ -48,6 +48,13 @@
     <h2>New deal</h2>
     <p class="muted">Choose how big a puzzle you'd like.</p>
     <div class="choices" id="diffChoices"></div>
+    <h3 class="subhead">Layout</h3>
+    <div class="choices two">
+      <label class="choice"><input type="radio" name="layout" value="classic">
+        <span><b>Deck &amp; columns</b><small>Draw from a deck; category cards start new columns.</small></span></label>
+      <label class="choice"><input type="radio" name="layout" value="twin">
+        <span><b>Two rows</b><small>Everything dealt face down, no deck. Category cards can top a matching stack and carry it.</small></span></label>
+    </div>
     <label class="toggle"><input type="checkbox" id="optLimit"> Limited moves (earn more by playing a "sponsored" mini-game)</label>
     <label class="toggle"><input type="checkbox" id="optHighlight"> Highlight where the selected card can go</label>
     <div class="row">
@@ -65,6 +72,7 @@
       <li><b>Category cards</b> (the coloured ones) go into the empty slots at the top left. Each one shows how many words it needs.</li>
       <li>Once a category is in a slot, drop its words onto it. When it's full, it clears and frees the slot.</li>
       <li>In the columns, stack words that <b>share a category</b>, and move those stacks together. Anything can go into an empty column.</li>
+      <li><b>Two rows layout:</b> there's no deck. A category card can go on top of a stack of its words, and then the whole stack moves together onto matching cards or into a slot.</li>
       <li>Tap the deck to draw a card. When it runs out, tap again to recycle it. Unlimited.</li>
       <li>Some words fit more than one category (<i>Orange</i>: fruit or colour?). Any reading is accepted as long as the deal can still be finished.</li>
       <li>Drag cards, or tap one to pick it up and tap where it should go. Tap a picked-up card again to send it somewhere sensible automatically.</li>

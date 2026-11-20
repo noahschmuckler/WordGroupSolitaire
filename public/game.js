@@ -10,9 +10,9 @@ const norm = s => s.toLowerCase();
 ALL_CATS.forEach(c => { c.set = new Set(c.words.map(norm)); });
 
 const DIFFS = {
-  relaxed:     { label: 'Relaxed',     desc: '5 categories · 4 columns · ~27 cards', cats: 5, min: 4, max: 5, cols: 4, downs: [0, 1, 2, 3], slots: 4, budget: 30 },
-  classic:     { label: 'Classic',     desc: '7 categories · 5 columns · ~42 cards', cats: 7, min: 4, max: 6, cols: 5, downs: [0, 1, 2, 3, 4], slots: 4, budget: 45 },
-  challenging: { label: 'Challenging', desc: '9 categories · 6 columns · ~60 cards', cats: 9, min: 5, max: 7, cols: 6, downs: [0, 1, 2, 3, 4, 5], slots: 4, budget: 70 },
+  relaxed:     { label: 'Relaxed',     desc: '5 categories · 4 columns · ~27 cards', cats: 5, min: 4, max: 5, cols: 4, downs: [0, 1, 2, 3], slots: 4, budget: 30, twinSlots: 4, twinBudget: 18 },
+  classic:     { label: 'Classic',     desc: '7 categories · 5 columns · ~42 cards', cats: 7, min: 4, max: 6, cols: 5, downs: [0, 1, 2, 3, 4], slots: 4, budget: 45, twinSlots: 5, twinBudget: 27 },
+  challenging: { label: 'Challenging', desc: '9 categories · 6 columns · ~60 cards', cats: 9, min: 5, max: 7, cols: 6, downs: [0, 1, 2, 3, 4, 5], slots: 4, budget: 70, twinSlots: 5, twinBudget: 40 },
 };
 
 // ----------------------------------------------------------------- rng ----
@@ -38,12 +38,13 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
 };
-const settings = Object.assign({ diff: 'classic', highlight: false, moveLimit: true }, store.get('wgs.settings', {}));
+const settings = Object.assign({ diff: 'classic', highlight: false, moveLimit: true, layout: 'classic' }, store.get('wgs.settings', {}));
 const stats = Object.assign({ played: 0, won: 0 }, store.get('wgs.stats', {}));
 
 // ---------------------------------------------------------- generation ----
-function generate(diffKey, seed) {
+function generate(diffKey, seed, layout = 'classic') {
   const D = DIFFS[diffKey];
+  const twin = layout === 'twin';
   const rnd = mulberry32(seed);
   const sharesWith = (a, b) => ALL_CATS[a].words.some(w => ALL_CATS[b].set.has(norm(w)));
 
@@ -88,24 +89,39 @@ function generate(diffKey, seed) {
   });
 
   const deck = shuffle(cards.map(c => c.id), rnd);
-  const cols = D.downs.map(nDown => {
-    const col = [];
-    for (let k = 0; k <= nDown; k++) col.push({ id: deck.pop(), up: k === nDown });
-    return col;
-  });
+  let cols;
+  if (twin) {
+    // Two facing rows, every card dealt, only the outermost card face up.
+    const nCols = D.cols * 2;
+    cols = Array.from({ length: nCols }, () => []);
+    let k = 0;
+    while (deck.length) cols[k++ % nCols].push({ id: deck.pop(), up: false });
+    cols.forEach(col => { if (col.length) col[col.length - 1].up = true; });
+  } else {
+    cols = D.downs.map(nDown => {
+      const col = [];
+      for (let k = 0; k <= nDown; k++) col.push({ id: deck.pop(), up: k === nDown });
+      return col;
+    });
+  }
   // Make sure at least one category card is visible at the start.
   const tops = cols.map(c => c[c.length - 1]);
   if (!tops.some(t => cards[t.id].kind === 'cat')) {
-    const catInDeck = deck.findIndex(id => cards[id].kind === 'cat');
     const t = pick(tops, rnd);
-    if (catInDeck >= 0) { const tmp = t.id; t.id = deck[catInDeck]; deck[catInDeck] = tmp; }
+    if (twin) {
+      const hidden = cols.flat().find(x => !x.up && cards[x.id].kind === 'cat');
+      if (hidden) { const tmp = t.id; t.id = hidden.id; hidden.id = tmp; }
+    } else {
+      const catInDeck = deck.findIndex(id => cards[id].kind === 'cat');
+      if (catInDeck >= 0) { const tmp = t.id; t.id = deck[catInDeck]; deck[catInDeck] = tmp; }
+    }
   }
 
   return {
-    v: 1, seed, diff: diffKey, cats, cards,
+    v: 1, seed, diff: diffKey, layout: twin ? 'twin' : 'classic', cats, cards,
     stock: deck, waste: [], cols,
-    slots: Array.from({ length: D.slots }, () => ({ card: null, cat: null, words: [] })),
-    doneOrder: [], moves: 0, won: false, left: D.budget,
+    slots: Array.from({ length: twin ? D.twinSlots : D.slots }, () => ({ card: null, cat: null, words: [] })),
+    doneOrder: [], moves: 0, won: false, left: twin ? D.twinBudget : D.budget,
   };
 }
 
@@ -114,10 +130,13 @@ let S = null;           // current game
 let undoStack = [];
 const MUTABLE = ['cats', 'stock', 'waste', 'cols', 'slots', 'doneOrder', 'moves', 'won'];
 const snapshot = () => JSON.stringify(MUTABLE.reduce((o, k) => (o[k] = S[k], o), {}));
-function pushUndo() { undoStack.push(snapshot()); if (undoStack.length > 1000) undoStack.shift(); }
+function pushUndo() { if (SIM) return; undoStack.push(snapshot()); if (undoStack.length > 1000) undoStack.shift(); }
 function save() { store.set('wgs.game', S); store.set('wgs.undo', undoStack.slice(-200)); }
 
 const card = id => S.cards[id];
+const isTwin = () => S.layout === 'twin';
+const catOf = ids => ids.find(id => card(id).kind === 'cat');
+let SIM = false;   // true while the solver explores deals (no UI side effects)
 const activeCands = c => c.cands.filter(j => !S.cats[j].done);
 
 function locate(id) {
@@ -170,6 +189,19 @@ function canAssign(wordIds, c) {
 
 // A group's shared category options, or null if it is not a coherent group.
 function groupSet(ids) {
+  if (isTwin()) {
+    // Two-rows rule: any mix of words that share a category, plus at most one
+    // category card (anywhere in the stack) that matches them.
+    let cat = null, set = null;
+    for (const id of ids) {
+      const c = card(id);
+      if (c.kind === 'cat') { if (cat != null || S.cats[c.cat].done) return null; cat = c.cat; continue; }
+      set = set ? set.filter(j => c.cands.includes(j)) : activeCands(c);
+      if (!set.length) return null;
+    }
+    if (cat != null) return !set || set.includes(cat) ? [cat] : null;
+    return set;
+  }
   const first = card(ids[0]);
   if (first.kind === 'cat') {
     if (S.cats[first.cat].done) return null;
@@ -203,15 +235,16 @@ function unitAt(id) {
 }
 
 // Category options of the coherent run sitting on top of a column.
-function topRunSet(col) {
+function topRunIds(col) {
   let best = null;
   for (let i = col.length - 1; i >= 0 && col[i].up; i--) {
-    const set = groupSet(col.slice(i).map(x => x.id));
-    if (!set) break;
-    best = set;
+    const ids = col.slice(i).map(x => x.id);
+    if (!groupSet(ids)) break;
+    best = ids;
   }
   return best;
 }
+function topRunSet(col) { const ids = topRunIds(col); return ids ? groupSet(ids) : null; }
 
 function canDrop(unit, target) {
   const ids = unit.ids;
@@ -220,20 +253,23 @@ function canDrop(unit, target) {
     if (unit.from.where === 'col' && unit.from.col === target.col) return false;
     const col = S.cols[target.col];
     if (!col.length) return true;
-    if (first.kind === 'cat') return false;
     const top = col[col.length - 1];
     if (!top.up) return false;
+    if (isTwin()) { const run = topRunIds(col); return !!(run && groupSet([...run, ...ids])); }
+    if (first.kind === 'cat') return false;
     const tset = topRunSet(col);
     const uset = groupSet(ids);
     return !!(tset && uset && tset.some(j => uset.includes(j)));
   }
   if (target.type === 'slot') {
     const slot = S.slots[target.slot];
+    const catId = catOf(ids);
     if (slot.cat == null) {
-      if (first.kind !== 'cat') return false;
-      return ids.length === 1 || canAssign(ids.slice(1), first.cat);
+      if (catId == null) return false;
+      const words = ids.filter(id => id !== catId);
+      return !words.length || canAssign(words, card(catId).cat);
     }
-    if (first.kind === 'cat') return false;
+    if (catId != null) return false;
     return canAssign(ids, slot.cat);
   }
   return false;
@@ -253,7 +289,7 @@ function removeUnit(unit) {
 // ---- move budget (the "free to play" parody) ----
 const limited = () => settings.moveLimit && !S.won;
 function spendMove() {
-  if (!limited()) return true;
+  if (SIM || !limited()) return true;
   if (S.left <= 0) { outOfMoves(); return false; }
   S.left--;
   return true;
@@ -269,7 +305,8 @@ function doMove(unit, target) {
   } else {
     const slot = S.slots[target.slot];
     let ids = unit.ids;
-    if (card(ids[0]).kind === 'cat') { slot.card = ids[0]; slot.cat = card(ids[0]).cat; ids = ids.slice(1); }
+    const catId = catOf(ids);
+    if (catId != null) { slot.card = catId; slot.cat = card(catId).cat; ids = ids.filter(id => id !== catId); }
     const cat = S.cats[slot.cat];
     ids.forEach(id => { slot.words.push(id); cat.placed++; });
     if (cat.placed >= cat.target) {
@@ -284,7 +321,7 @@ function doMove(unit, target) {
     }
   }
   S.moves++;
-  if (S.cats.every(c => c.done) && !S.won) {
+  if (S.cats.every(c => c.done) && !S.won && !SIM) {
     S.won = true; stats.won++; store.set('wgs.stats', stats);
     const wonGame = S; setTimeout(() => { if (S === wonGame) showWin(); }, 700);
   }
@@ -292,6 +329,7 @@ function doMove(unit, target) {
 }
 
 function draw() {
+  if (isTwin()) return;
   if (!S.stock.length && !S.waste.length) { toast('The deck is empty.'); return; }
   if (!spendMove()) { commit(); return; }
   pushUndo();
@@ -310,10 +348,9 @@ function undo() {
 
 // Smart destination for a tapped-twice card.
 function autoTarget(unit) {
-  const first = card(unit.ids[0]);
   const targets = [];
   S.slots.forEach((s, i) => { if (s.cat != null) targets.push({ type: 'slot', slot: i }); });
-  if (first.kind === 'cat') S.slots.forEach((s, i) => { if (s.cat == null) targets.push({ type: 'slot', slot: i }); });
+  if (catOf(unit.ids) != null) S.slots.forEach((s, i) => { if (s.cat == null) targets.push({ type: 'slot', slot: i }); });
   S.cols.forEach((c, i) => { if (c.length) targets.push({ type: 'col', col: i }); });
   const wholeCol = unit.from.where === 'col' && unit.from.i === 0;
   if (!wholeCol) S.cols.forEach((c, i) => { if (!c.length) targets.push({ type: 'col', col: i }); });
@@ -321,34 +358,74 @@ function autoTarget(unit) {
 }
 
 // ---------------------------------------------------------------- hint ----
-function findHint() {
+// Candidate moves grouped by how useful they usually are.
+function moveTiers() {
   const units = [];
-  if (S.waste.length) units.push(unitAt(S.waste[S.waste.length - 1]));
-  S.cols.forEach(col => col.forEach((x, i) => { if (x.up) { const u = unitAt(x.id); if (u) units.push(u); } }));
-  const slotT = S.slots.map((_, i) => ({ type: 'slot', slot: i }));
-  const colT = S.cols.map((_, i) => ({ type: 'col', col: i }));
-  const ok = (u, t) => u && canDrop(u, t);
-
-  for (const u of units) for (const t of slotT) if (S.slots[t.slot].cat != null && ok(u, t)) return { u, t };
-  for (const u of units) if (card(u.ids[0]).kind === 'cat') for (const t of slotT) if (S.slots[t.slot].cat == null && ok(u, t)) return { u, t };
+  if (S.waste.length) { const u = unitAt(S.waste[S.waste.length - 1]); if (u) units.push(u); }
+  S.cols.forEach(col => col.forEach(x => { if (x.up) { const u = unitAt(x.id); if (u) units.push(u); } }));
+  const T = [[], [], [], [], []];
   for (const u of units) {
-    if (u.from.where !== 'col') continue;
-    const col = S.cols[u.from.col];
-    const firstUp = col.findIndex(x => x.up);
-    if (u.from.i !== firstUp) continue;
-    const reveals = firstUp > 0;
-    for (const t of colT) {
-      const dest = S.cols[t.col];
-      if (!dest.length && !reveals) continue;
-      if (ok(u, t)) return { u, t };
+    S.slots.forEach((sl, i) => { const t = { type: 'slot', slot: i }; if (sl.cat != null && canDrop(u, t)) T[0].push({ u, t }); });
+    if (catOf(u.ids) != null) {
+      const i = S.slots.findIndex(sl => sl.cat == null);
+      if (i >= 0 && canDrop(u, { type: 'slot', slot: i })) T[1].push({ u, t: { type: 'slot', slot: i } });
+    }
+    if (u.from.where === 'col') {
+      const col = S.cols[u.from.col];
+      const firstUp = col.findIndex(x => x.up);
+      const reveals = u.from.i === firstUp && firstUp > 0;
+      S.cols.forEach((dest, j) => {
+        if (j === u.from.col) return;
+        if (!dest.length && !reveals) return;
+        const t = { type: 'col', col: j };
+        if (!canDrop(u, t)) return;
+        if (reveals) T[2].push({ u, t });
+        else if (isTwin() && dest.length) T[4].push({ u, t });
+      });
+    } else {
+      S.cols.forEach((dest, j) => {
+        const t = { type: 'col', col: j };
+        if ((dest.length || catOf(u.ids) != null) && canDrop(u, t)) T[3].push({ u, t });
+      });
     }
   }
-  const w = units.find(u => u.from.where === 'waste');
-  if (w) for (const t of colT) if (S.cols[t.col].length && ok(w, t)) return { u: w, t };
-  if (w && card(w.ids[0]).kind === 'cat') for (const t of colT) if (!S.cols[t.col].length && ok(w, t)) return { u: w, t };
+  return T;
+}
+function findHint() {
+  const T = moveTiers();
+  for (const tier of T) if (tier.length) return tier[0];
   if (S.stock.length || S.waste.length) return { draw: true };
   return null;
 }
+
+// Plays a deal with a randomised greedy strategy; true if it can be finished.
+function solves(state, tries = 30, seed = 1) {
+  const keep = S, rnd = mulberry32(seed);
+  SIM = true;
+  try {
+    for (let t = 0; t < tries; t++) {
+      S = JSON.parse(JSON.stringify(state));
+      const seen = new Set();
+      const key = () => JSON.stringify(S.cols) + JSON.stringify(S.slots.map(x => x.cat));
+      seen.add(key());
+      for (let step = 0; step < 500 && !S.cats.every(c => c.done); step++) {
+        const options = moveTiers().flatMap(tier => shuffle(tier, rnd));
+        let moved = false;
+        for (const m of options) {
+          const snap = snapshot();
+          doMove(m.u, m.t);
+          const k = key();
+          if (!seen.has(k)) { seen.add(k); moved = true; break; }
+          Object.assign(S, JSON.parse(snap));
+        }
+        if (!moved) break;
+      }
+      if (S.cats.every(c => c.done)) return true;
+    }
+    return false;
+  } finally { SIM = false; S = keep; fx.flip.clear(); fx.vanish.clear(); fx.pop.clear(); fx.toast = null; }
+}
+
 function showHint() {
   clearSelection();
   const h = findHint();
@@ -423,7 +500,33 @@ function computeLayout() {
   const upOff = Math.round(Math.max(22, fs * 1.15 + 11));
   const downOff = Math.max(7, Math.round(ch * 0.09));
   const avail = Math.max(ch * 2.5, window.innerHeight - board.getBoundingClientRect().top - window.scrollY - tabY - pad - 8);
-  return { W, cw, ch, fs, gap, pad, topY, tabY, slotX, stockX, wasteX, colX, upOff, downOff, avail };
+  return { W, cw, ch, fs, gap, pad, topY, tabY, slotY: topY, slotX, stockX, wasteX, colX, upOff, downOff, avail };
+}
+
+// Two facing rows of columns with the category slots between them.
+function computeTwinLayout() {
+  const D = DIFFS[S.diff];
+  const W = board.clientWidth;
+  const half = S.cols.length / 2, nSlots = S.slots.length;
+  const n = Math.max(half, nSlots);
+  const gap = Math.max(4, Math.min(12, Math.round(W * 0.014)));
+  const pad = gap + 2;
+  const cw = Math.floor(Math.min(96, (W - 2 * pad - (n - 1) * gap) / n));
+  const ch = Math.round(cw * 1.28);
+  const fs = Math.max(12, Math.min(22, cw * 0.2));
+  const availH = window.innerHeight - board.getBoundingClientRect().top - window.scrollY - 2 * pad - 8;
+  const fanH = Math.round(Math.min(ch * 2.4, Math.max(ch * 0.9, (availH - 3 * ch - 8 * gap) / 2)));
+  const total = 2 * fanH + 3 * ch + 8 * gap;
+  const anchorTop = pad + Math.max(0, Math.round((availH - total) / 2)) + fanH;
+  const slotY = anchorTop + ch + gap * 2;
+  const anchorBot = slotY + ch + gap * 2;
+  const rowX = (count, i) => Math.round((W - (count * cw + (count - 1) * gap)) / 2) + i * (cw + gap);
+  return {
+    twin: true, W, cw, ch, fs, gap, pad, fanH, anchorTop, slotY, anchorBot, half,
+    topY: slotY, slotX: i => rowX(nSlots, i), colX: i => rowX(half, i % half),
+    upOff: Math.round(Math.max(22, fs * 1.15 + 11)), downOff: Math.max(7, Math.round(ch * 0.09)),
+    stockX: -9999, wasteX: -9999,
+  };
 }
 
 function fitFont(el, text, cw, base, isCat) {
@@ -436,18 +539,19 @@ function fitFont(el, text, cw, base, isCat) {
 }
 
 function render() {
-  L = computeLayout();
+  L = isTwin() ? computeTwinLayout() : computeLayout();
   const { cw, ch } = L;
   board.style.setProperty('--cw', cw + 'px');
   const place = (el, x, y, w = cw, h = ch) => {
     el.style.width = w + 'px'; el.style.height = h + 'px';
     el.style.transform = `translate(${x}px, ${y}px)`;
   };
-  slotSpots.forEach((d, i) => { place(d, L.slotX(i), L.topY); d.style.fontSize = Math.max(8, Math.min(11, cw / 7.5)) + 'px'; });
+  stockSpot.style.display = wasteSpot.style.display = isTwin() ? 'none' : '';
+  slotSpots.forEach((d, i) => { place(d, L.slotX(i), L.slotY); d.style.fontSize = Math.max(8, Math.min(11, cw / 7.5)) + 'px'; });
   place(stockSpot, L.stockX, L.topY);
   place(wasteSpot, L.wasteX, L.topY);
   stockBadge.textContent = S.stock.length || '';
-  stockBadge.style.display = S.stock.length ? '' : 'none';
+  stockBadge.style.display = S.stock.length && !isTwin() ? '' : 'none';
   stockBadge.style.transform = `translate(${L.stockX + cw - 4}px, ${L.topY + 4}px) translateX(-100%)`;
   stockSpot.innerHTML = S.stock.length ? '' :
     (S.waste.length ? '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>' : 'Empty');
@@ -474,12 +578,29 @@ function render() {
   });
   // slots
   S.slots.forEach((s, i) => {
-    s.words.forEach((id, k) => { P[id] = { x: L.slotX(i), y: L.topY, z: 10 + k, up: true, flat: true }; });
-    if (s.card != null) P[s.card] = { x: L.slotX(i), y: L.topY, z: 200, up: true };
+    s.words.forEach((id, k) => { P[id] = { x: L.slotX(i), y: L.slotY, z: 10 + k, up: true, flat: true }; });
+    if (s.card != null) P[s.card] = { x: L.slotX(i), y: L.slotY, z: 200, up: true };
   });
   // columns (compress if tall)
-  let maxBottom = L.tabY + L.ch;
-  S.cols.forEach((col, c) => {
+  let maxBottom = L.twin ? L.anchorBot + ch + L.fanH : L.tabY + L.ch;
+  if (L.twin) S.cols.forEach((col, c) => {
+    // Outermost card sits next to the slots; the rest fan away from the middle.
+    const top = c < L.half, dir = top ? -1 : 1, anchor = top ? L.anchorTop : L.anchorBot;
+    const strip = x => x.up ? Math.max(L.upOff, Math.ceil(els[x.id]._lh + 12)) : L.downOff;
+    let sum = 0;
+    for (let i = 0; i < col.length - 1; i++) sum += strip(col[i]);
+    const k = sum > L.fanH ? L.fanH / sum : 1;
+    let y = anchor;
+    for (let i = col.length - 1; i >= 0; i--) {
+      if (i < col.length - 1) y += dir * strip(col[i]) * k;
+      P[col[i].id] = { x: L.colX(c), y: Math.round(y), z: 10 + i, up: col[i].up, rev: !top };
+    }
+    place(colSpots[c], L.colX(c), anchor);
+    colSpots[c]._zone = top
+      ? { x: L.colX(c) - L.gap / 2, y: 0, w: cw + L.gap, h: L.anchorTop + ch + L.gap }
+      : { x: L.colX(c) - L.gap / 2, y: L.anchorBot - L.gap, w: cw + L.gap, h: ch + L.fanH + L.gap * 2 };
+  });
+  else S.cols.forEach((col, c) => {
     const nDown = col.filter(x => !x.up).length;
     const nUp = col.length - nDown;
     const dOff = L.downOff;
@@ -499,7 +620,7 @@ function render() {
     place(colSpots[c], L.colX(c), L.tabY);
     colSpots[c]._zone = { x: L.colX(c) - L.gap / 2, y: L.tabY - 6, w: cw + L.gap, h: bottom - L.tabY + ch * 0.6 };
   });
-  slotSpots.forEach((d, i) => { d._zone = { x: L.slotX(i) - 4, y: L.topY - 4, w: cw + 8, h: ch + 8 }; });
+  slotSpots.forEach((d, i) => { d._zone = { x: L.slotX(i) - 4, y: L.slotY - 4, w: cw + 8, h: ch + 8 }; });
   board.style.height = Math.ceil(maxBottom + L.pad + ch * 0.5) + 'px';
 
   // done cards
@@ -526,6 +647,7 @@ function render() {
     }
     el.classList.remove('gone', 'pop');
     el.classList.toggle('flat', !!p.flat);
+    el.classList.toggle('rev', !!p.rev);
     const moved = !old || old.gone || old.x !== p.x || old.y !== p.y;
     if (moved && !firstPaint) {
       el.style.zIndex = 1000 + p.z;
@@ -705,6 +827,7 @@ function openNew() {
   box.innerHTML = Object.entries(DIFFS).map(([k, d]) => `
     <label class="choice"><input type="radio" name="diff" value="${k}" ${k === settings.diff ? 'checked' : ''}>
       <span><b>${d.label}</b><small>${d.desc}</small></span></label>`).join('');
+  document.querySelectorAll('input[name=layout]').forEach(r => { r.checked = r.value === settings.layout; });
   document.getElementById('optHighlight').checked = settings.highlight;
   document.getElementById('optLimit').checked = settings.moveLimit;
   dlgNew.showModal();
@@ -715,6 +838,8 @@ dlgNew.addEventListener('close', () => {
   if (dlgNew.returnValue === 'deal') {
     const r = dlgNew.querySelector('input[name=diff]:checked');
     if (r) settings.diff = r.value;
+    const lay = dlgNew.querySelector('input[name=layout]:checked');
+    if (lay) settings.layout = lay.value;
     store.set('wgs.settings', settings);
     newGame(settings.diff);
   } else {
@@ -761,7 +886,7 @@ function playAd() {
 function showWin() {
   const esc = s => s.replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
   document.getElementById('winSummary').textContent =
-    `${DIFFS[S.diff].label} deal finished in ${S.moves} moves. Games won: ${stats.won}.`;
+    `${DIFFS[S.diff].label}${isTwin() ? ' two-row' : ''} deal finished in ${S.moves} moves. Games won: ${stats.won}.`;
   document.getElementById('winList').innerHTML = S.doneOrder.map(j => {
     const c = S.cats[j];
     return `<div><b>${esc(c.name)}</b>: ${c.collected.map(esc).join(', ')}</div>`;
@@ -776,8 +901,12 @@ document.getElementById('btnHelp').addEventListener('click', () => dlgHelp.showM
 
 // --------------------------------------------------------------- start ----
 function newGame(diffKey) {
-  const seed = (Math.random() * 2 ** 31) >>> 0;
-  S = generate(diffKey, seed);
+  const layout = settings.layout;
+  let seed = (Math.random() * 2 ** 31) >>> 0;
+  let g = generate(diffKey, seed, layout);
+  // Without a deck to recycle, make sure the deal can actually be finished.
+  for (let k = 0; layout === 'twin' && k < 60 && !solves(g, 20, seed); k++) { seed = (seed + 7919) >>> 0; g = generate(diffKey, seed, layout); }
+  S = g;
   undoStack = [];
   selection = null;
   stats.played++; store.set('wgs.stats', stats);
@@ -790,6 +919,7 @@ function resume() {
   if (g && g.v === 1 && DIFFS[g.diff] && Array.isArray(g.cards)) {
     S = g;
     if (typeof S.left !== 'number') S.left = DIFFS[S.diff].budget;
+    if (!S.layout) S.layout = 'classic';
     undoStack = store.get('wgs.undo', []) || [];
     build();
     render();

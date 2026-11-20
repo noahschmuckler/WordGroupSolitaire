@@ -303,3 +303,10 @@ body.pp-open { overflow: hidden; }
 .pp.cr .pp-banner { color: #fff; text-shadow: 0 3px 0 #2b3fb0, 0 6px 14px rgba(0,0,0,.25); }
 .pp.cr .pp-stage canvas { border-radius: 16px; box-shadow: 0 10px 30px rgba(20,0,80,.3); }
 .pp.cr .pp-stage { touch-action: none; }
+
+/* Two-rows layout: bottom-row cards fan downward, so labels sit at the bottom edge */
+.card.rev .face { flex-direction: column-reverse; padding: 4px 4px 5px; }
+.card.rev.cat .count { margin-top: 0; margin-bottom: auto; }
+.subhead { margin: 14px 0 6px; font: 600 13px Inter, system-ui, sans-serif; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.choices.two { grid-template-columns: 1fr 1fr; }
+@media (max-width: 420px) { .choices.two { grid-template-columns: 1fr; } }
