@@ -292,3 +292,8 @@ body.pp-open { overflow: hidden; }
 .pp.pj .pp-banner { color: #fff3a8; text-shadow: 0 3px 0 #1d4fb8, 0 6px 14px rgba(0,0,0,.25); }
 .pp-tip .pj-patience, .pp-tip .pj-bus { display: inline-block; margin: 0 6px; white-space: nowrap; }
 .pp-tip .pj-bus { opacity: .85; font-weight: 500; }
+
+/* Draw to Save theme */
+.pp.ds { background: linear-gradient(165deg, #ffcf3f 0%, #ff8a4c 45%, #f2457c 85%, #b13cf0 100%); }
+.pp.ds .pp-banner { color: #ffffff; text-shadow: 0 3px 0 #c0392b, 0 6px 14px rgba(0,0,0,.25); }
+.pp.ds .pp-stage canvas { border-radius: 16px; box-shadow: 0 10px 30px rgba(80,0,40,.3); }

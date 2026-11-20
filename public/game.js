@@ -740,10 +740,12 @@ dlgOut.addEventListener('close', () => {
 });
 // Rotate between the "sponsors", never the same one three times running.
 function pickAd() {
-  const ads = { pin: PinPull, park: ParkJam };
+  const ads = { pin: PinPull, park: ParkJam, draw: DrawSave };
+  const keys = Object.keys(ads);
   const recent = store.get('wgs.recentAds', []);
-  let key = Math.random() < 0.5 ? 'pin' : 'park';
-  if (recent.length >= 2 && recent[0] === key && recent[1] === key) key = key === 'pin' ? 'park' : 'pin';
+  let pool = keys;
+  if (recent.length >= 2 && recent[0] === recent[1]) pool = keys.filter(k => k !== recent[0]);
+  const key = pool[Math.floor(Math.random() * pool.length)];
   store.set('wgs.recentAds', [key, ...recent].slice(0, 2));
   return ads[key];
 }
