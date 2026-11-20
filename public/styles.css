@@ -226,3 +226,63 @@ kbd { font: 12px ui-monospace, monospace; border: 1px solid var(--card-edge); bo
   font: 600 11px Inter, system-ui, sans-serif; display: flex; align-items: center; justify-content: center;
   font-variant-numeric: tabular-nums;
 }
+
+.stats i { font-style: normal; }
+.stats .low b { color: #ffb347; }
+.stats .low { animation: lowpulse 1.4s ease-in-out infinite; }
+@keyframes lowpulse { 50% { opacity: .55; } }
+.offer { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 12px;
+  background: linear-gradient(135deg, #7b5cff, #ff5fa2); color: #fff; }
+.offer-big { font: 400 40px "Lilita One", system-ui, sans-serif; line-height: 1; }
+.offer small { opacity: .85; }
+
+/* ---------- Pin Pull "ad" overlay ---------- */
+body.pp-open { overflow: hidden; }
+.pp {
+  position: fixed; inset: 0; z-index: 5000; display: flex; flex-direction: column; align-items: center;
+  background: linear-gradient(165deg, #5b3cf5 0%, #b545e0 45%, #ff5f8f 80%, #ffa34d 100%);
+  color: #fff; font-family: Inter, system-ui, sans-serif;
+  padding: max(10px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  animation: ppin .25s ease;
+}
+.pp.pp-out { animation: ppout .25s ease forwards; }
+@keyframes ppin { from { opacity: 0; transform: scale(1.04); } }
+@keyframes ppout { to { opacity: 0; transform: scale(.97); } }
+.pp-top { width: 100%; max-width: 520px; display: flex; align-items: center; gap: 10px; min-height: 34px; position: relative; }
+.pp-chip { font: 700 10px Inter, sans-serif; letter-spacing: .08em; background: rgba(0,0,0,.25); padding: 3px 6px; border-radius: 4px; }
+.pp-level { font: 400 18px "Lilita One", system-ui, sans-serif; text-shadow: 0 2px 0 rgba(0,0,0,.2); }
+.pp-x {
+  position: absolute; right: 0; top: 2px; width: 26px; height: 26px; border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,.5); background: rgba(0,0,0,.15); color: rgba(255,255,255,.75);
+  font: 600 12px Inter, sans-serif; display: flex; align-items: center; justify-content: center; padding: 0; cursor: default;
+  transition: right .35s cubic-bezier(.5,1.8,.4,.8), top .35s, transform .35s;
+}
+.pp-x.ready { cursor: pointer; font-size: 11px; }
+.pp-x.dodge { right: calc(100% - 26px); top: 40px; transform: rotate(360deg); }
+.pp-banner {
+  margin: 6px 0 4px; font: 400 clamp(22px, 6.5vw, 34px) "Lilita One", system-ui, sans-serif; text-align: center;
+  color: #fff7b0; text-shadow: 0 3px 0 #b8306b, 0 6px 14px rgba(0,0,0,.25);
+  animation: wobble 2.2s ease-in-out infinite;
+}
+@keyframes wobble { 0%,100% { transform: rotate(-2deg) scale(1); } 50% { transform: rotate(2deg) scale(1.05); } }
+.pp-stage { flex: 1; width: 100%; max-width: 520px; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.pp-stage canvas { touch-action: none; display: block; }
+.pp-tip { font-size: 14px; font-weight: 600; opacity: .92; text-align: center; min-height: 20px; margin-top: 4px; text-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.pp-result {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(330px, calc(100vw - 32px));
+  background: #fff; color: #2a1c4a; border-radius: 20px; padding: 22px 20px 18px; text-align: center;
+  box-shadow: 0 20px 60px rgba(40,0,80,.45); animation: popin .35s cubic-bezier(.3,1.6,.5,1);
+}
+.pp-result[hidden] { display: none; }
+@keyframes popin { from { transform: translate(-50%, -50%) scale(.6); opacity: 0; } }
+.pp-result h3 { margin: 0 0 6px; font: 400 32px "Lilita One", system-ui, sans-serif; color: #7b3cf5; }
+.pp-result p { margin: 0 0 16px; font-size: 15px; line-height: 1.4; }
+.pp-result small { color: #8a7fa3; }
+.pp-result button {
+  display: block; width: 100%; margin-top: 8px; border: 0; border-radius: 12px; padding: 12px; cursor: pointer;
+  font: 400 18px "Lilita One", system-ui, sans-serif; letter-spacing: .02em;
+}
+.pp-install, .pp-retry { background: linear-gradient(180deg, #4fe08a, #22b35e); color: #fff; box-shadow: 0 4px 0 #17853f; }
+.pp-install { animation: throb 1s ease-in-out infinite; }
+@keyframes throb { 50% { transform: scale(1.05); } }
+.pp-collect { background: #efe9fb; color: #5b3cf5; }

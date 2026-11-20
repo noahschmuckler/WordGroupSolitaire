@@ -10,9 +10,9 @@ const norm = s => s.toLowerCase();
 ALL_CATS.forEach(c => { c.set = new Set(c.words.map(norm)); });
 
 const DIFFS = {
-  relaxed:     { label: 'Relaxed',     desc: '5 categories · 4 columns · ~27 cards', cats: 5, min: 4, max: 5, cols: 4, downs: [0, 1, 2, 3], slots: 4 },
-  classic:     { label: 'Classic',     desc: '7 categories · 5 columns · ~42 cards', cats: 7, min: 4, max: 6, cols: 5, downs: [0, 1, 2, 3, 4], slots: 4 },
-  challenging: { label: 'Challenging', desc: '9 categories · 6 columns · ~60 cards', cats: 9, min: 5, max: 7, cols: 6, downs: [0, 1, 2, 3, 4, 5], slots: 4 },
+  relaxed:     { label: 'Relaxed',     desc: '5 categories · 4 columns · ~27 cards', cats: 5, min: 4, max: 5, cols: 4, downs: [0, 1, 2, 3], slots: 4, budget: 30 },
+  classic:     { label: 'Classic',     desc: '7 categories · 5 columns · ~42 cards', cats: 7, min: 4, max: 6, cols: 5, downs: [0, 1, 2, 3, 4], slots: 4, budget: 45 },
+  challenging: { label: 'Challenging', desc: '9 categories · 6 columns · ~60 cards', cats: 9, min: 5, max: 7, cols: 6, downs: [0, 1, 2, 3, 4, 5], slots: 4, budget: 70 },
 };
 
 // ----------------------------------------------------------------- rng ----
@@ -38,7 +38,7 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
 };
-const settings = Object.assign({ diff: 'classic', highlight: false }, store.get('wgs.settings', {}));
+const settings = Object.assign({ diff: 'classic', highlight: false, moveLimit: true }, store.get('wgs.settings', {}));
 const stats = Object.assign({ played: 0, won: 0 }, store.get('wgs.stats', {}));
 
 // ---------------------------------------------------------- generation ----
@@ -105,7 +105,7 @@ function generate(diffKey, seed) {
     v: 1, seed, diff: diffKey, cats, cards,
     stock: deck, waste: [], cols,
     slots: Array.from({ length: D.slots }, () => ({ card: null, cat: null, words: [] })),
-    doneOrder: [], moves: 0, won: false,
+    doneOrder: [], moves: 0, won: false, left: D.budget,
   };
 }
 
@@ -250,8 +250,18 @@ function removeUnit(unit) {
   }
 }
 
+// ---- move budget (the "free to play" parody) ----
+const limited = () => settings.moveLimit && !S.won;
+function spendMove() {
+  if (!limited()) return true;
+  if (S.left <= 0) { outOfMoves(); return false; }
+  S.left--;
+  return true;
+}
+
 function doMove(unit, target) {
   if (!canDrop(unit, target)) return false;
+  if (!spendMove()) return 'blocked';
   pushUndo();
   removeUnit(unit);
   if (target.type === 'col') {
@@ -283,6 +293,7 @@ function doMove(unit, target) {
 
 function draw() {
   if (!S.stock.length && !S.waste.length) { toast('The deck is empty.'); return; }
+  if (!spendMove()) { commit(); return; }
   pushUndo();
   if (S.stock.length) S.waste.push(S.stock.pop());
   else { S.stock = S.waste.reverse(); S.waste = []; }
@@ -541,7 +552,14 @@ function render() {
   }
 
   document.getElementById('groupsDone').textContent = `${S.doneOrder.length}/${S.cats.length}`;
-  document.getElementById('moveCount').textContent = S.moves;
+  const mc = document.getElementById('moveCount');
+  if (limited() || (settings.moveLimit && S.won)) {
+    mc.textContent = S.left; mc.nextSibling.textContent = ' moves left';
+    mc.parentElement.classList.toggle('low', S.left <= 5 && !S.won);
+  } else {
+    mc.textContent = S.moves; mc.nextSibling.textContent = ' moves';
+    mc.parentElement.classList.remove('low');
+  }
   document.getElementById('btnUndo').disabled = !undoStack.length;
 }
 
@@ -574,11 +592,14 @@ function tapCard(id) {
     if (selection.ids.includes(id)) {
       const t = autoTarget(selection);
       const u = selection; selection = null;
-      if (t && doMove(u, t)) commit(); else { render(); shake(u.ids); }
+      const r = t ? doMove(u, t) : false;
+      if (r === true) commit(); else { render(); if (r !== 'blocked') shake(u.ids); }
       return;
     }
     const t = targetFromLoc(Lc);
-    if (t && doMove(selection, t)) { selection = null; commit(); return; }
+    const r = t ? doMove(selection, t) : false;
+    if (r === 'blocked') { selection = null; render(); return; }
+    if (r) { selection = null; commit(); return; }
     const u = unitAt(id);
     if (u) { selection = u; render(); return; }
     const old = selection; selection = null; render(); shake(old.ids);
@@ -594,8 +615,9 @@ function tapSpot(spot) {
   let t = null;
   if (spot.dataset.slot != null) t = { type: 'slot', slot: +spot.dataset.slot };
   if (spot.dataset.col != null) t = { type: 'col', col: +spot.dataset.col };
-  if (t && doMove(selection, t)) { selection = null; commit(); }
-  else { const old = selection; selection = null; render(); shake(old.ids); }
+  const r = t ? doMove(selection, t) : false;
+  if (r === true) { selection = null; commit(); }
+  else { const old = selection; selection = null; render(); if (r !== 'blocked') shake(old.ids); }
 }
 
 let drag = null;
@@ -644,8 +666,10 @@ function endDrag(e) {
   slotSpots.forEach((s, i) => zones.push({ t: { type: 'slot', slot: i }, a: overlap(s._zone) }));
   colSpots.forEach((s, i) => zones.push({ t: { type: 'col', col: i }, a: overlap(s._zone) }));
   const order = zones.filter(z => z.a > 0).sort((a, b2) => b2.a - a.a);
-  const moved = order.some(z => doMove(d.unit, z.t));
+  let blocked = false;
+  const moved = order.some(z => { const r = doMove(d.unit, z.t); if (r === 'blocked') blocked = true; return r === true || blocked; }) && !blocked;
   if (moved) commit();
+  else if (blocked) render();
   else {
     render();
     const isSelf = order.length && order[0].t.type === 'col' && d.unit.from.where === 'col' && order[0].t.col === d.unit.from.col;
@@ -682,10 +706,12 @@ function openNew() {
     <label class="choice"><input type="radio" name="diff" value="${k}" ${k === settings.diff ? 'checked' : ''}>
       <span><b>${d.label}</b><small>${d.desc}</small></span></label>`).join('');
   document.getElementById('optHighlight').checked = settings.highlight;
+  document.getElementById('optLimit').checked = settings.moveLimit;
   dlgNew.showModal();
 }
 dlgNew.addEventListener('close', () => {
   settings.highlight = document.getElementById('optHighlight').checked;
+  settings.moveLimit = document.getElementById('optLimit').checked;
   if (dlgNew.returnValue === 'deal') {
     const r = dlgNew.querySelector('input[name=diff]:checked');
     if (r) settings.diff = r.value;
@@ -698,6 +724,28 @@ dlgNew.addEventListener('close', () => {
 });
 dlgWin.addEventListener('close', () => { if (dlgWin.returnValue === 'again') openNew(); });
 dlgHelp.addEventListener('close', () => store.set('wgs.seenHelp', true));
+
+const dlgOut = document.getElementById('dlgOut');
+function outOfMoves() {
+  if (dlgOut.open || document.body.classList.contains('pp-open')) return;
+  selection = null;
+  dlgOut.showModal();
+}
+dlgOut.addEventListener('close', () => {
+  if (dlgOut.returnValue === 'play') playAd();
+  else if (dlgOut.returnValue === 'nolimit') {
+    settings.moveLimit = false; store.set('wgs.settings', settings);
+    toast('Move limit off. Play as long as you like.'); render();
+  }
+});
+function playAd() {
+  PinPull.open({
+    onDone: ({ reward, message }) => {
+      S.left += reward; save(); render();
+      toast(message || `+${reward} moves. Back to sorting!`);
+    },
+  });
+}
 
 function showWin() {
   const esc = s => s.replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
@@ -730,6 +778,7 @@ function resume() {
   const g = store.get('wgs.game', null);
   if (g && g.v === 1 && DIFFS[g.diff] && Array.isArray(g.cards)) {
     S = g;
+    if (typeof S.left !== 'number') S.left = DIFFS[S.diff].budget;
     undoStack = store.get('wgs.undo', []) || [];
     build();
     render();

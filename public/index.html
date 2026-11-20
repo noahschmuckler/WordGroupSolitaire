@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Lilita+One&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -19,7 +19,7 @@
   <div class="brand">Word Groups</div>
   <div class="stats">
     <span><b id="groupsDone">0/0</b> groups</span>
-    <span><b id="moveCount">0</b> moves</span>
+    <span><b id="moveCount">0</b><i> moves</i></span>
   </div>
   <nav class="actions">
     <button id="btnUndo" title="Undo (Ctrl+Z)" aria-label="Undo">
@@ -46,8 +46,9 @@
 <dialog id="dlgNew">
   <form method="dialog">
     <h2>New deal</h2>
-    <p class="muted">Choose how big a puzzle you'd like. There's no move limit, ever.</p>
+    <p class="muted">Choose how big a puzzle you'd like.</p>
     <div class="choices" id="diffChoices"></div>
+    <label class="toggle"><input type="checkbox" id="optLimit"> Limited moves (earn more by playing a "sponsored" mini-game)</label>
     <label class="toggle"><input type="checkbox" id="optHighlight"> Highlight where the selected card can go</label>
     <div class="row">
       <button value="cancel" class="ghost">Cancel</button>
@@ -67,9 +68,25 @@
       <li>Tap the deck to draw a card. When it runs out, tap again to recycle it. Unlimited.</li>
       <li>Some words fit more than one category (<i>Orange</i>: fruit or colour?). Any reading is accepted as long as the deal can still be finished.</li>
       <li>Drag cards, or tap one to pick it up and tap where it should go. Tap a picked-up card again to send it somewhere sensible automatically.</li>
-      <li>Undo is unlimited. Keys: <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>H</kbd> hint, <kbd>Space</kbd> draw.</li>
+      <li><b>Moves:</b> with the move limit on, running out offers a quick mini-game that earns more. It's free, and you can switch the limit off in <i>New deal</i>.</li>
+      <li>Undo is unlimited and free. Keys: <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>H</kbd> hint, <kbd>Space</kbd> draw.</li>
     </ul>
     <div class="row"><button value="ok" class="primary">Got it</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgOut">
+  <form method="dialog">
+    <h2>Out of moves!</h2>
+    <p class="muted">Play a quick sponsored game to earn more. Nothing to buy, promise. The sponsor is also us.</p>
+    <div class="offer">
+      <div class="offer-big">+15</div>
+      <div><b>moves</b><br><small>for clearing a level (+8 if you don't)</small></div>
+    </div>
+    <div class="row">
+      <button value="nolimit" class="ghost">Turn off move limit</button>
+      <button value="play" class="primary">Play for moves</button>
+    </div>
   </form>
 </dialog>
 
@@ -86,6 +103,7 @@
 </dialog>
 
 <script src="words.js"></script>
+<script src="pinpull.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
